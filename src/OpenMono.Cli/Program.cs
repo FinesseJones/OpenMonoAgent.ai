@@ -10,8 +10,17 @@ using OpenMono.Permissions;
 using OpenMono.Playbooks;
 using OpenMono.Rendering;
 using OpenMono.Session;
+using OpenMono.Setup;
 using OpenMono.Tools;
 using OpenMono.Utils;
+
+// Subcommand: openmono agent tunnel --inference
+if (args.Length >= 3 && args[0] == "agent" && args[1] == "tunnel" && args[2] == "--inference")
+{
+    var dataDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openmono");
+    return await TunnelSetupWizard.RunAsync(dataDir);
+}
 
 string? endpoint = null, model = null, workdir = null, configPath = null;
 var verbose = false;
@@ -37,6 +46,10 @@ for (var i = 0; i < args.Length; i++)
             Console.WriteLine("OpenMono.ai — Local Coding Agent");
             Console.WriteLine();
             Console.WriteLine("Usage: openmono [options]");
+            Console.WriteLine("       openmono agent tunnel --inference");
+            Console.WriteLine();
+            Console.WriteLine("Subcommands:");
+            Console.WriteLine("  agent tunnel --inference   Set up the frp relay tunnel on this inference box");
             Console.WriteLine();
             Console.WriteLine("Options:");
             Console.WriteLine("  --endpoint <url>   LLM server endpoint (default: http://localhost:7474)");
