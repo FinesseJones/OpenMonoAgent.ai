@@ -69,4 +69,10 @@ chmod +x "$INSTALL_DIR/openmono" "$INSTALL_DIR/scripts/"*.sh
 
 # ── Hand off to openmono setup (passes all flags through) ────────────────────
 
-exec "$INSTALL_DIR/openmono" setup "${PASSTHROUGH_ARGS[@]+"${PASSTHROUGH_ARGS[@]}"}"
+# When piped through curl, stdin is the pipe not the terminal — restore it so
+# interactive prompts in `openmono setup` can read user input.
+if [[ ! -t 0 ]]; then
+    exec "$INSTALL_DIR/openmono" setup "${PASSTHROUGH_ARGS[@]+"${PASSTHROUGH_ARGS[@]}"}" </dev/tty
+else
+    exec "$INSTALL_DIR/openmono" setup "${PASSTHROUGH_ARGS[@]+"${PASSTHROUGH_ARGS[@]}"}"
+fi
