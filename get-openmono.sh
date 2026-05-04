@@ -7,6 +7,7 @@ set -euo pipefail
 
 REPO_URL="https://github.com/StartupHakk/OpenMonoAgent.ai.git"
 INSTALL_DIR="${OPENMONO_HOME:-$HOME/openmono.ai}"
+BRANCH=""
 
 BLUE='\033[38;2;163;255;102m'
 GREEN='\033[0;32m'
@@ -18,6 +19,23 @@ ok()   { echo -e "${GREEN}[OK]${NC} $*"; }
 err()  { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 die()  { err "$*"; exit 1; }
 
+# ── Argument parsing ──────────────────────────────────────────────────────────
+
+PASSTHROUGH_ARGS=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -b|--branch)
+            [[ -n "${2:-}" ]] || die "--branch requires a value"
+            BRANCH="$2"; shift 2 ;;
+        -*)
+            PASSTHROUGH_ARGS+=("$1"); shift ;;
+        *)
+            # First bare positional arg is treated as an optional branch name
+            [[ -z "$BRANCH" ]] && BRANCH="$1" || PASSTHROUGH_ARGS+=("$1")
+            shift ;;
+    esac
+done
+
 # ── Preflight checks ──────────────────────────────────────────────────────────
 
 command -v git  &>/dev/null || die "git is required – install it first: sudo apt install git"
@@ -25,13 +43,22 @@ command -v curl &>/dev/null || die "curl is required – install it first: sudo 
 
 # ── Clone or update ───────────────────────────────────────────────────────────
 
+BRANCH_LABEL="${BRANCH:-default}"
+
 if [ -d "$INSTALL_DIR/.git" ]; then
-    info "Repository already exists at $INSTALL_DIR – pulling latest..."
+    info "Repository already exists at $INSTALL_DIR – fetching latest..."
+    git -C "$INSTALL_DIR" fetch --quiet 2>/dev/null || info "Fetch failed; continuing with existing checkout"
+    if [[ -n "$BRANCH" ]]; then
+        info "Switching to branch '$BRANCH'..."
+        git -C "$INSTALL_DIR" checkout "$BRANCH" 2>/dev/null || die "Branch '$BRANCH' not found"
+    fi
     git -C "$INSTALL_DIR" pull --ff-only 2>/dev/null \
         || info "Could not fast-forward; continuing with existing checkout"
 else
-    info "Cloning OpenMono.ai to $INSTALL_DIR..."
-    git clone "$REPO_URL" "$INSTALL_DIR" || die "git clone failed"
+    info "Cloning OpenMono.ai ($BRANCH_LABEL branch) to $INSTALL_DIR..."
+    CLONE_ARGS=("$REPO_URL" "$INSTALL_DIR")
+    [[ -n "$BRANCH" ]] && CLONE_ARGS=(--branch "$BRANCH" "${CLONE_ARGS[@]}")
+    git clone "${CLONE_ARGS[@]}" || die "git clone failed"
 fi
 
 ok "Repository ready at $INSTALL_DIR"
@@ -42,4 +69,4 @@ chmod +x "$INSTALL_DIR/openmono" "$INSTALL_DIR/scripts/"*.sh
 
 # ── Hand off to openmono setup (passes all flags through) ────────────────────
 
-exec "$INSTALL_DIR/openmono" setup "$@"
+exec "$INSTALL_DIR/openmono" setup "${PASSTHROUGH_ARGS[@]+"${PASSTHROUGH_ARGS[@]}"}"
