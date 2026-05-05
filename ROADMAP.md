@@ -39,6 +39,7 @@
 - [ ] Session tagging and forking
 - [ ] File watching during active sessions
 - [ ] VS Code extension — quick-access agent from the editor
+- [ ] ACP (Agent Client Protocol) support for editor integrations such as Zed
 - [ ] Desktop app — Tauri or Electron wrapper
 - [ ] Web frontend for remote access
 - [ ] Slack and GitHub App integrations
