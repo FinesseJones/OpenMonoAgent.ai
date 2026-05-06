@@ -159,6 +159,10 @@ Local llama.cpp is the default and fully supported. OpenAI, Anthropic, and Ollam
 
 > **09 · Distributed inference** — Agent on your laptop, inference on a separate GPU machine. Free relay at [app.openmonoagent.ai](https://app.openmonoagent.ai).
 
+<div align="center">
+  <img src="docs/assets/dual-box-server.png" alt="Distributed inference: agent on laptop, inference on GPU machine" width="680" />
+</div>
+
 ---
 
 ## Supported Hardware
