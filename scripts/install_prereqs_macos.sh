@@ -248,9 +248,12 @@ else
     fi
 
     if ! docker info &>/dev/null 2>&1; then
-        info "Starting Colima daemon..."
-        if ! run colima start; then
-            die "Failed to start Colima. Check: colima status"
+        info "Starting and enabling Colima for auto-start..."
+        if ! run brew services start colima; then
+            warn "brew services start colima failed; trying manual start..."
+            if ! run colima start; then
+                die "Failed to start Colima. Check: colima status"
+            fi
         fi
 
         info "Waiting for Docker daemon to be ready..."
@@ -267,6 +270,8 @@ else
         if ! docker info &>/dev/null 2>&1; then
             die "Docker daemon failed to start after 30s. Check: colima status"
         fi
+    else
+        ok "Docker daemon is running"
     fi
 
     # Install docker-buildx (required for Colima path to build images)
@@ -312,33 +317,6 @@ if [ -f "$_BUILDX_BIN" ]; then
     mkdir -p "$HOME/.docker/cli-plugins"
     ln -sfn "$_BUILDX_BIN" "$HOME/.docker/cli-plugins/docker-buildx"
     detail "Linked docker-buildx as Docker CLI plugin"
-fi
-
-# Start Colima and enable auto-start at login (if Colima was installed)
-if command -v colima &>/dev/null && command -v brew &>/dev/null; then
-    info "Starting Colima and enabling auto-start..."
-    if run brew services start colima; then
-        ok "Colima started and enabled for auto-start at login (via launchd)"
-
-        # Wait for Colima VM to be ready
-        info "Waiting for Colima to be fully ready..."
-        COLIMA_READY=false
-        for i in $(seq 1 60); do
-            if docker info &>/dev/null 2>&1; then
-                COLIMA_READY=true
-                break
-            fi
-            sleep 1
-        done
-
-        if [ "$COLIMA_READY" = true ]; then
-            ok "Colima is ready"
-        else
-            warn "Colima is starting but not yet accessible (may take a moment)"
-        fi
-    else
-        die "Could not start Colima with 'brew services start colima'. Check Colima logs: colima logs"
-    fi
 fi
 
 # ── Step 7: .NET 10 SDK ──────────────────────────────────────────────────────
