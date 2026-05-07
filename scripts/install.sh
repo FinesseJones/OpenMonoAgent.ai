@@ -466,6 +466,27 @@ else
     PHYS_CORES="$(lscpu -b -p=Core,Socket 2>/dev/null | grep -v '^#' | sort -u | wc -l)"
     [ "${PHYS_CORES:-0}" -gt 0 ] && CPU_THREADS="$PHYS_CORES"
 
+    # Memory-aware ctx-size: --no-mmap loads the full model into RAM, so we
+    # subtract model size + 3 GB OS headroom and derive a ctx-size that fits.
+    # KV cache at q8_0 ≈ 512 bytes/token (conservative for this MoE model).
+    _TOTAL_MEM_KB=$(awk '/^MemTotal:/{print $2}' /proc/meminfo 2>/dev/null || echo 0)
+    _TOTAL_MEM_BYTES=$(( _TOTAL_MEM_KB * 1024 ))
+    _MODEL_BYTES=$(stat -c%s "$MODEL_FILE" 2>/dev/null || echo 0)
+    _OS_HEADROOM=$(( 3 * 1024 * 1024 * 1024 ))
+    _KV_BUDGET=$(( _TOTAL_MEM_BYTES - _MODEL_BYTES - _OS_HEADROOM ))
+
+    if [ "$_KV_BUDGET" -gt 0 ]; then
+        SAFE_CTX=$(( _KV_BUDGET / 512 ))
+        SAFE_CTX=$(( (SAFE_CTX / 1024) * 1024 ))   # round down to nearest 1024
+        [ "$SAFE_CTX" -lt 4096 ]   && SAFE_CTX=4096
+        [ "$SAFE_CTX" -gt 131072 ] && SAFE_CTX=131072
+        info "RAM: $(( _TOTAL_MEM_BYTES / 1024 / 1024 / 1024 ))GB total, model ~$(( _MODEL_BYTES / 1024 / 1024 / 1024 ))GB → ctx-size $SAFE_CTX"
+    else
+        SAFE_CTX=4096
+        warn "RAM too low to safely load model + KV cache — using ctx-size=$SAFE_CTX"
+        warn "Consider adding more RAM or using a smaller model."
+    fi
+
     # Detect non-NVIDIA GPUs (AMD/Intel) that can be used via Vulkan passthrough.
     HAS_VULKAN_GPU=false
     VK_GROUPS=""
@@ -501,7 +522,7 @@ ${VK_GROUP_ADD}
       --alias $MODEL_ALIAS
       --host 0.0.0.0
       --port 7474
-      --ctx-size 0
+      --ctx-size $SAFE_CTX
       --threads $CPU_THREADS
       --threads-batch $CPU_THREADS
       --batch-size 512
@@ -513,7 +534,6 @@ ${VK_GROUP_ADD}
       --jinja
       --reasoning off
       --no-warmup
-      --no-mmap
       --metrics
       \${LLAMA_API_KEY:+--api-key \${LLAMA_API_KEY}}
 OVERRIDE_EOF
