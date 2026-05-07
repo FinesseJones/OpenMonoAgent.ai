@@ -282,8 +282,8 @@ if [ "$OPENMONO_ROLE" != "agent" ]; then
         MODEL_URL="https://huggingface.co/unsloth/Qwen3.6-27B-GGUF/resolve/main/Qwen3.6-27B-Q4_K_M.gguf"
         next_step "Downloading Qwen3.6-27B-Q4_K_M model (~15 GB) [GPU]"
     else
-        MODEL_NAME="qwen3.6-35b-a3b-ud-q4_k_xl.gguf"
-        MODEL_URL="https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf"
+        MODEL_NAME="Qwen3.6-35B-A3B-UD-IQ4_NL_XL.gguf"
+        MODEL_URL="https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-IQ4_NL_XL.gguf"
         next_step "Downloading Qwen3.6-35B-A3B model (~17.6 GB) [CPU]"
     fi
 
