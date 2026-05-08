@@ -621,71 +621,12 @@ if [ -w /usr/local/bin ] || [ -n "${SUDO:-}" ]; then
     fi
 fi
 
-# ── Done ──────────────────────────────────────────────────────────────────────
-
-echo ""
-printf "${GREEN}%s${NC}\n" "$(printf '─%.0s' $(seq 1 60))"
-printf "${GREEN}${BOLD}  Installation Complete${NC} (role: %s)\n" "$OPENMONO_ROLE"
-printf "${GREEN}%s${NC}\n" "$(printf '─%.0s' $(seq 1 60))"
-echo ""
-
-case "$OPENMONO_ROLE" in
-    full)
-        echo "  llama-server port : ${LLAMA_PORT:-7474}"
-        echo "  mode              : $([ "${GPU_MODE:-0}" = "1" ] && echo GPU || echo CPU)"
-        echo ""
-        printf "  ${BOLD}Reload your shell to apply changes:${NC}\n"
-        printf "    source ~/.bashrc\n"
-        ;;
-    inference)
-        echo "  llama-server port : ${LLAMA_PORT:-7474}"
-        echo "  mode              : $([ "${GPU_MODE:-0}" = "1" ] && echo GPU || echo CPU)"
-        echo ""
-        printf "  ${BOLD}Reload your shell to apply changes:${NC}\n"
-        printf "    source ~/.bashrc\n"
-        echo ""
-        printf "  ${BOLD}Next — expose this inference box over a tunnel:${NC}\n"
-        printf "    openmono tunnel setup --inference\n"
-        echo ""
-        printf "  ${BOLD}Then on the agent box, point it at this machine:${NC}\n"
-        printf "    openmono config set llm.endpoint http://<tunnel-url>:<port>\n"
-        printf "    openmono config set llm.api_key  <llama_api_key>\n"
-        echo ""
-        printf "  Example:\n"
-        printf "    openmono config set llm.endpoint http://relay.openmonoagent.ai:17474\n"
-        printf "    openmono config set llm.api_key  abc123def456\n"
-        ;;
-    agent)
-        echo "  role              : Agent only (dual-box mode)"
-        echo ""
-        printf "  ${BOLD}Reload your shell to apply changes:${NC}\n"
-        printf "    source ~/.bashrc\n"
-        echo ""
-        printf "  ${BOLD}Connect to your inference server:${NC}\n"
-        printf "    openmono config set llm.endpoint http://<tunnel-url>:<port>\n"
-        printf "    openmono config set llm.api_key  <llama_api_key>\n"
-        echo ""
-        printf "  If you did not receive these details by email, run the following\n"
-        printf "  on the inference server first:\n"
-        printf "    openmono tunnel setup --inference\n"
-        echo ""
-        printf "  Example:\n"
-        printf "    openmono config set llm.endpoint http://relay.openmonoagent.ai:17474\n"
-        printf "    openmono config set llm.api_key  abc123def456\n"
-        ;;
-esac
-echo ""
-show_log_location
-
-# ── Done ──────────────────────────────────────────────────────────────────────
-# The shell restart and docker group activation is handled by openmono cmd_setup
-# so that the post-install guidance is shown before the shell restarts.
-
 # Write environment to the file passed by openmono cmd_setup
 if [[ -n "${OPENMONO_ENV_FILE:-}" ]]; then
     cat > "$OPENMONO_ENV_FILE" <<ENVEOF
 export INSTALL_DIR="$INSTALL_DIR"
 export LLAMA_PORT="${LLAMA_PORT:-7474}"
+export GPU_MODE="${GPU_MODE:-0}"
 export OPENMONO_ROLE="$OPENMONO_ROLE"
 export MODEL_NAME="${MODEL_NAME:-}"
 export MODEL_ACCURACY="${MODEL_ACCURACY:-standard}"

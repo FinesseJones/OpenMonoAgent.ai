@@ -264,14 +264,33 @@ cmd_setup() {
         exit 1
     }
 
+    # Source env written by install.sh before printing the completion banner
+    # (needed for LLAMA_PORT, GPU_MODE, INSTALL_DIR, OPENMONO_ROLE)
+    if [[ -n "${OPENMONO_ENV_FILE:-}" ]] && [[ -f "$OPENMONO_ENV_FILE" ]]; then
+        # shellcheck source=/dev/null
+        source "$OPENMONO_ENV_FILE"
+    fi
+
+    # Fallback values if not set
+    INSTALL_DIR="${INSTALL_DIR:-$HOME/openmono.ai}"
+    LLAMA_PORT="${LLAMA_PORT:-7474}"
+
     # Print role-specific setup complete message
     echo ""
     printf "${BLUE}%s${NC}\n" "$(printf '─%.0s' $(seq 1 60))"
-    printf "${BLUE}${BOLD}  Setup Complete${NC}\n"
+    printf "${BLUE}${BOLD}  Setup Complete${NC} (role: %s)\n" "$OPENMONO_ROLE"
     printf "${BLUE}%s${NC}\n" "$(printf '─%.0s' $(seq 1 60))"
     echo ""
     echo -e "  ${GREEN}✓${NC} OpenMono.ai is ready to use!"
     echo ""
+
+    case "$OPENMONO_ROLE" in
+        full|inference)
+            echo "  llama-server port : ${LLAMA_PORT}"
+            echo "  mode              : $([ "${GPU_MODE:-0}" = "1" ] && echo GPU || echo CPU)"
+            echo ""
+            ;;
+    esac
 
     case "$OPENMONO_ROLE" in
         full)
@@ -334,16 +353,7 @@ cmd_setup() {
     echo "  Full help: openmono --help"
     printf "${BLUE}%s${NC}\n" "$(printf '─%.0s' $(seq 1 60))"
     echo ""
-
-    # Source environment variables written by install.sh (INSTALL_DIR, LLAMA_PORT, OPENMONO_ROLE)
-    if [[ -n "${OPENMONO_ENV_FILE:-}" ]] && [[ -f "$OPENMONO_ENV_FILE" ]]; then
-        # shellcheck source=/dev/null
-        source "$OPENMONO_ENV_FILE"
-    fi
-
-    # Fallback values if not set
-    INSTALL_DIR="${INSTALL_DIR:-$HOME/openmono.ai}"
-    LLAMA_PORT="${LLAMA_PORT:-7474}"
+    show_log_location
 
     # Update shell rc files to add openmono to PATH
     info "Updating shell configuration..."
