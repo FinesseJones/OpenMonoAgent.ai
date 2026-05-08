@@ -36,7 +36,7 @@ if [[ -n "${OPENMONO_CPU:-}" ]]; then
 fi
 # If not set by a flag, restore from a previous interrupted run
 if [[ -z "$GPU_MODE" && -f "$HOME/.openmono/.setup_prefs" ]]; then
-    _saved_gpu=$(grep '^GPU_MODE=' "$HOME/.openmono/.setup_prefs" | cut -d= -f2 | tr -d '[:space:]')
+    _saved_gpu=$(grep '^GPU_MODE=' "$HOME/.openmono/.setup_prefs" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]' || true)
     if [[ -n "$_saved_gpu" ]]; then
         GPU_MODE="$_saved_gpu"
         # Defer the "restoring" message until after log.sh helpers are confirmed sourced
