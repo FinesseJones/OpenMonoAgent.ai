@@ -690,8 +690,12 @@ case "$OPENMONO_ROLE" in
         echo "     Example:"
         echo "        openmono config set llm.endpoint http://<server>:<port>"
         echo "        openmono config set llm.api_key  <token>"
+        echo ""
+        echo "     Don't have these configs in your email?"
+        echo "     On the inference server, run:  openmono tunnel setup --inference"
+        echo ""
         echo "  3. cd your-project/ && openmono agent"
-        echo ""        
+        echo ""
         ;;
 esac
 echo ""
