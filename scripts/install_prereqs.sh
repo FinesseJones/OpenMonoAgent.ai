@@ -164,8 +164,11 @@ elif grep -qi "0x10de" /sys/bus/pci/devices/*/vendor 2>/dev/null; then
     detail "NVIDIA GPU detected via PCI vendor ID (0x10de)"
 fi
 
-# Determine GPU mode: explicit flag takes precedence, then auto-detect with prompt
-if [[ -z "$GPU_MODE" ]]; then
+# Determine GPU mode: explicit flag takes precedence, then role check, then auto-detect
+if [[ "${OPENMONO_ROLE:-}" == "agent" ]]; then
+    GPU_MODE=0
+    info "Agent-only role — skipping GPU stack"
+elif [[ -z "$GPU_MODE" ]]; then
     # No flag provided — auto-detect and prompt if NVIDIA hardware is found
     if [ "$HAS_NVIDIA_HW" = true ] || command -v nvidia-smi &>/dev/null; then
         echo ""

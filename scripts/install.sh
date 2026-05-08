@@ -127,20 +127,22 @@ check_prerequisites() {
         warnings+=(".NET SDK not installed (optional, but recommended)")
     fi
 
-    # Check for NVIDIA requirements if GPU is present
+    # Check for NVIDIA requirements if GPU is present (agent role never needs GPU)
     HAS_NVIDIA_HW=false
-    if command -v lspci &>/dev/null && lspci 2>/dev/null | grep -qi 'nvidia'; then
-        HAS_NVIDIA_HW=true
-    elif grep -qi "0x10de" /sys/bus/pci/devices/*/vendor 2>/dev/null; then
-        HAS_NVIDIA_HW=true
-    fi
-
-    if [ "$HAS_NVIDIA_HW" = true ]; then
-        if ! command -v nvidia-smi &>/dev/null; then
-            warnings+=("NVIDIA GPU detected but drivers not installed")
+    if [ "${OPENMONO_ROLE:-}" != "agent" ]; then
+        if command -v lspci &>/dev/null && lspci 2>/dev/null | grep -qi 'nvidia'; then
+            HAS_NVIDIA_HW=true
+        elif grep -qi "0x10de" /sys/bus/pci/devices/*/vendor 2>/dev/null; then
+            HAS_NVIDIA_HW=true
         fi
-        if ! dpkg -s nvidia-container-toolkit &>/dev/null 2>&1; then
-            warnings+=("nvidia-container-toolkit not installed (required for GPU Docker)")
+
+        if [ "$HAS_NVIDIA_HW" = true ]; then
+            if ! command -v nvidia-smi &>/dev/null; then
+                warnings+=("NVIDIA GPU detected but drivers not installed")
+            fi
+            if ! dpkg -s nvidia-container-toolkit &>/dev/null 2>&1; then
+                warnings+=("nvidia-container-toolkit not installed (required for GPU Docker)")
+            fi
         fi
     fi
 
