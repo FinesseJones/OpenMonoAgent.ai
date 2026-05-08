@@ -32,8 +32,7 @@ public sealed class ConversationLoop : IDisposable
     private readonly ToolResultCache _cache;
     private readonly ArtifactStore _artifactStore;
 
-    private readonly List<string> _recentToolSignatures = [];
-    private const int DoomLoopThreshold = 3;
+    private readonly DoomLoopDetector _doomLoop = new();
 
     private const int LargeResultThreshold = 20_000;
 
@@ -81,6 +80,7 @@ public sealed class ConversationLoop : IDisposable
 
     public async Task RunTurnAsync(string userInput, CancellationToken ct)
     {
+        _doomLoop.Reset();
         _session.AddMessage(new Message { Role = MessageRole.User, Content = userInput });
         _session.TurnCount++;
         _liveFeedback?.BeginTurn();
@@ -150,11 +150,13 @@ public sealed class ConversationLoop : IDisposable
                     cpSw.Stop();
                     _output.WriteInfo($"Checkpoint #{_session.Checkpoints.Count} stored — {entry.MessagesCompressed} messages compressed in {cpSw.Elapsed.TotalSeconds:F1}s.");
                     _output.WriteDebug($"[Checkpoint] Done — effective window={_checkpointer.BuildContextWindow(_session).Count} messages");
+                    _doomLoop.Reset();
                     i = -1; continue;
                 }
                 else if (_compactor.NeedsCompaction(_checkpointer.BuildContextWindow(_session), iterPromptTokens))
                 {
                     await RunCompactionAsync(iterPromptTokens, customInstructions: null, ct);
+                    _doomLoop.Reset();
                     i = -1; continue;
                 }
             }
@@ -262,7 +264,7 @@ public sealed class ConversationLoop : IDisposable
                 return;
             }
 
-            if (DetectDoomLoop(toolCalls))
+            if (_doomLoop.Check(toolCalls))
             {
 
                 await siblingAbortCts.CancelAsync();
@@ -321,23 +323,6 @@ public sealed class ConversationLoop : IDisposable
         {
             _liveFeedback?.EndTurn();
         }
-    }
-
-    private bool DetectDoomLoop(List<ToolCall> currentCalls)
-    {
-        var signature = string.Join("|", currentCalls.Select(c => $"{c.Name}:{c.Arguments}"));
-        _recentToolSignatures.Add(signature);
-
-        if (_recentToolSignatures.Count < DoomLoopThreshold)
-            return false;
-
-        var recent = _recentToolSignatures.TakeLast(DoomLoopThreshold).ToList();
-        var isDoomLoop = recent.All(s => s == recent[0]);
-
-        if (_recentToolSignatures.Count > DoomLoopThreshold * 2)
-            _recentToolSignatures.RemoveRange(0, _recentToolSignatures.Count - DoomLoopThreshold);
-
-        return isDoomLoop;
     }
 
     private async Task ReportIterationCapAsync(int maxIterations, List<ToolCall> lastToolCalls, CancellationToken ct)

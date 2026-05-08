@@ -22,8 +22,7 @@ public sealed class ToolDispatcher : IDisposable
     private readonly ToolResultCache _cache;
     private readonly ArtifactStore _artifactStore;
 
-    private readonly List<string> _recentToolSignatures = [];
-    private const int DoomLoopThreshold = 3;
+    private readonly DoomLoopDetector _doomLoop = new();
 
     public ToolDispatcher(
         ToolRegistry tools,
@@ -62,10 +61,7 @@ public sealed class ToolDispatcher : IDisposable
         if (toolCalls.Count == 0)
             return [];
 
-        var signature = ComputeToolSignature(toolCalls);
-        _recentToolSignatures.Add(signature);
-
-        if (DetectDoomLoop(toolCalls))
+        if (_doomLoop.Check(toolCalls))
         {
             _renderer.WriteWarning("Doom loop detected — same tool calls repeated 3 times");
             return [ToolResult.InvalidInput(
@@ -304,29 +300,6 @@ public sealed class ToolDispatcher : IDisposable
         FileHistory = _session.Meta.FileHistory,
         Cursors = _cursorStore,
     };
-
-    private static string ComputeToolSignature(List<ToolCall> toolCalls)
-    {
-        var parts = toolCalls.Select(tc => $"{tc.Name}:{tc.Arguments}");
-        return string.Join("|", parts);
-    }
-
-    private bool DetectDoomLoop(List<ToolCall> currentCalls)
-    {
-        var currentSig = ComputeToolSignature(currentCalls);
-        _recentToolSignatures.Add(currentSig);
-
-        if (_recentToolSignatures.Count < DoomLoopThreshold)
-            return false;
-
-        var recent = _recentToolSignatures.TakeLast(DoomLoopThreshold).ToList();
-        var isDoomLoop = recent.All(s => s == recent[0]);
-
-        if (_recentToolSignatures.Count > DoomLoopThreshold * 2)
-            _recentToolSignatures.RemoveRange(0, _recentToolSignatures.Count - DoomLoopThreshold);
-
-        return isDoomLoop;
-    }
 
     public void Dispose()
     {

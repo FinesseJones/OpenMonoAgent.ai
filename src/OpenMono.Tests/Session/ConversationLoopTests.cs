@@ -100,6 +100,77 @@ public class ConversationLoopTests
         tracker.TotalCompletionTokens.Should().Be(20);
     }
 
+    [Fact]
+    public async Task DoomLoop_DoesNotFireAcrossUserTurns()
+    {
+        static List<StreamChunk> ToolRound(string id) =>
+        [
+            new() { ToolCallDelta = new ToolCall { Id = id, Name = "TestTool", Arguments = "{}" }, IsComplete = false },
+            new() { IsComplete = true },
+        ];
+        static List<StreamChunk> TextRound() =>
+        [
+            new() { TextDelta = "Done.", IsComplete = false },
+            new() { IsComplete = true },
+        ];
+
+        var llm = new FakeLlmClient(
+            ToolRound("t1"), TextRound(),   // turn 1
+            ToolRound("t2"), TextRound(),   // turn 2
+            ToolRound("t3"), TextRound()    // turn 3 — new prompt after /checkpoint
+        );
+
+        var tools = new ToolRegistry();
+        tools.Register(new TestTool());
+        var session = new SessionState();
+        session.AddMessage(new Message { Role = MessageRole.System, Content = "System" });
+        var renderer = new TerminalRenderer();
+        var config = new AppConfig();
+        var loop = new ConversationLoop(llm, tools, new PermissionEngine(config, renderer, renderer),
+            renderer, renderer, renderer, config, session);
+
+        await loop.RunTurnAsync("Turn 1", CancellationToken.None);
+        await loop.RunTurnAsync("Turn 2", CancellationToken.None);
+        // /checkpoint would run here in real usage — it cannot clear _recentToolSignatures (the bug)
+        await loop.RunTurnAsync("Completely different prompt after checkpoint", CancellationToken.None);
+
+        session.Messages
+            .Where(m => m.Role == MessageRole.User)
+            .Should().NotContain(m => m.Content != null && m.Content.Contains("Doom loop detected"));
+    }
+
+    [Fact]
+    public async Task DoomLoop_FiresOnAlternatingPattern_PeriodTwo()
+    {
+        static List<StreamChunk> Round(string toolName) =>
+        [
+            new() { ToolCallDelta = new ToolCall { Id = toolName, Name = toolName, Arguments = "{}" }, IsComplete = false },
+            new() { IsComplete = true },
+        ];
+
+        // ABAB — model oscillates between two tools, never making progress
+        var llm = new FakeLlmClient(
+            Round("ToolA"), Round("ToolB"),
+            Round("ToolA"), Round("ToolB")
+        );
+
+        var tools = new ToolRegistry();
+        tools.Register(new TestTool("ToolA"));
+        tools.Register(new TestTool("ToolB"));
+        var session = new SessionState();
+        session.AddMessage(new Message { Role = MessageRole.System, Content = "System" });
+        var renderer = new TerminalRenderer();
+        var config = new AppConfig();
+        var loop = new ConversationLoop(llm, tools, new PermissionEngine(config, renderer, renderer),
+            renderer, renderer, renderer, config, session);
+
+        await loop.RunTurnAsync("Do the thing", CancellationToken.None);
+
+        session.Messages
+            .Where(m => m.Role == MessageRole.User)
+            .Should().Contain(m => m.Content != null && m.Content.Contains("Doom loop detected"));
+    }
+
     private sealed class FakeLlmClient : ILlmClient
     {
         private readonly List<List<StreamChunk>> _rounds;
@@ -129,9 +200,9 @@ public class ConversationLoopTests
         public void Dispose() { }
     }
 
-    private sealed class TestTool : ITool
+    private sealed class TestTool(string name = "TestTool") : ITool
     {
-        public string Name => "TestTool";
+        public string Name => name;
         public string Description => "A test tool";
         public bool IsConcurrencySafe => true;
         public bool IsReadOnly => true;
