@@ -230,7 +230,9 @@ cmd_setup() {
         if getent group docker 2>/dev/null | grep -qw "$USER"; then
             if command -v sg &>/dev/null && sg docker -c "docker info" &>/dev/null 2>&1; then
                 info "Re-launching with docker group active..."
-                exec sg docker -- bash "$0" setup "$@"
+                _reexec_cmd="$(printf '%q' "$0") setup"
+                for _a in "$@"; do _reexec_cmd+=" $(printf '%q' "$_a")"; done
+                exec sg docker -c "$_reexec_cmd"
             else
                 err "User '$USER' was added to the docker group but activation failed."
                 err "Run ONE of the following to activate the docker group:"
