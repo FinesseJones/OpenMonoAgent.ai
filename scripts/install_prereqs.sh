@@ -143,6 +143,12 @@ fi
 
 step 5 $TOTAL_STEPS "Checking for NVIDIA GPU"
 
+if [[ "${OPENMONO_ROLE:-}" == "agent" ]]; then
+    info "Agent-only role — skipping GPU detection"
+    GPU_MODE=0
+    HAS_NVIDIA_HW=false
+else
+
 HAS_NVIDIA_HW=false
 # Try lspci first (most descriptive)
 if command -v lspci &>/dev/null && lspci 2>/dev/null | grep -qi 'nvidia'; then
@@ -252,6 +258,8 @@ else
         ok "nvidia-container-toolkit installed"
     fi
 fi
+
+fi # end agent-role GPU skip
 
 # ── Step 6: Docker ────────────────────────────────────────────────────────────
 
