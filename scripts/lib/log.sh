@@ -40,6 +40,18 @@ _cleanup_terminal() {
 # Set trap for common exit signals
 trap _cleanup_terminal EXIT INT TERM HUP
 
+# ERR trap — fires when any command exits non-zero under set -e.
+# Logs the failing command and line number so the log is always useful.
+# Does not fire for intentionally handled errors (||, if, &&).
+set -o errtrace
+_trap_err() {
+    local exit_code=$?
+    local line="${BASH_LINENO[0]:-?}"
+    local cmd="${BASH_COMMAND:-?}"
+    _log "FATAL: exit $exit_code at line $line — $cmd"
+}
+trap '_trap_err' ERR
+
 OPENMONO_VERBOSE="${OPENMONO_VERBOSE:-0}"
 
 # Log file: shared across install_prereqs.sh and install.sh within one setup run

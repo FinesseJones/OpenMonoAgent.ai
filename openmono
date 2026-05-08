@@ -223,7 +223,9 @@ cmd_setup() {
     mkdir -p "$(dirname "$OPENMONO_ENV_FILE")"
     : > "$OPENMONO_ENV_FILE"  # clear any previous run
 
-    bash "$_PREREQS_SCRIPT" || {
+    bash "$_PREREQS_SCRIPT" 2>> "$OPENMONO_LOG_FILE" || {
+        echo ""
+        show_log_tail 30
         err "Prerequisite install failed. Full log: $OPENMONO_LOG_FILE"
         exit 1
     }
@@ -260,7 +262,9 @@ cmd_setup() {
         fi
     fi
 
-    bash "$_INSTALL_SCRIPT" || {
+    bash "$_INSTALL_SCRIPT" 2>> "$OPENMONO_LOG_FILE" || {
+        echo ""
+        show_log_tail 30
         err "Installation failed. Full log: $OPENMONO_LOG_FILE"
         exit 1
     }
