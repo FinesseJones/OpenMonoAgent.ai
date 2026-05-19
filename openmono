@@ -535,6 +535,8 @@ cmd_agent() {
     fi
 
     docker compose run --rm \
+        --user "$(id -u):$(id -g)" \
+        -e HOME=/home/agent \
         -e WORKSPACE="$WORKSPACE" \
         -e LLAMA_PORT="$LLAMA_PORT" \
         agent "$@"
