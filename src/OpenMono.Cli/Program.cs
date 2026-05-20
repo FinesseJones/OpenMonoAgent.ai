@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using OpenMono.Acp;
 using OpenMono.Commands;
 using OpenMono.Config;
@@ -202,7 +204,16 @@ static async Task RunAgentAsync(string? endpoint, string? model, string? workdir
     {
         if (acpPort.HasValue) acp.Port = acpPort.Value;
         var acpCts = new CancellationTokenSource();
-        _ = AcpServer.StartAsync(acp, config, llm, tools, acpCts.Token);
+        // Future tasks add more services here: AcpSessionStore (T3), AcpLockFileWriter (T4),
+        // AcpTurnRunnerFactory (T8). For now the server is up but has no endpoints —
+        // AcpEndpoints.Map is intentionally empty until T7. T11 will replace this
+        // manual wiring with AcpHostedService.
+        var acpServices = new ServiceCollection();
+        acpServices.AddSingleton(config);
+        acpServices.AddSingleton(llm);
+        acpServices.AddSingleton(tools);
+        var acpApp = AcpServer.Build(acp, acpServices);
+        _ = acpApp.RunAsync(acpCts.Token);
         renderer.WriteInfo($"ACP server listening on http://127.0.0.1:{acp.Port}");
     }
 

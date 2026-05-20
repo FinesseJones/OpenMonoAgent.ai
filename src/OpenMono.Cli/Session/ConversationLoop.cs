@@ -567,22 +567,11 @@ public sealed class ConversationLoop : IDisposable
         CancellationTokenSource siblingAbortCts,
         CancellationToken ct)
     {
-        if (_executor?.PausesAfterEmit == true)
-        {
-            // ACP path: emit every tool_call to the client and register a pending TCS on the session,
-            // then throw so AcpTurnRunner can emit awaiting_tool_results and close the SSE stream.
-            // The next /turn POST with tool_results resolves the TCS entries; AcpTurnRunner adds the
-            // tool messages itself and re-enters via ContinueTurnAsync, so the orphaned Tasks here
-            // can complete in the background without anyone awaiting them.
-            foreach (var call in toolCalls)
-            {
-                if (inFlightTasks.ContainsKey(call.Id)) continue;
-                var tool = _tools.Resolve(call.Name);
-                inFlightTasks[call.Id] = _executor.ExecuteAsync(call, tool, context, siblingAbortCts.Token);
-            }
-            throw new OpenMono.Acp.PendingToolResultsException(toolCalls);
-        }
-
+        // Note: an earlier strategy paused the LLM loop here by emitting tool_call events to a
+        // remote client and throwing PendingToolResultsException. The new ACP strategy runs every
+        // tool locally inside the agent container, so this method is only ever called with the
+        // synchronous LocalToolExecutor path. Pause-resume now lives in IAcpUserInteraction (T5)
+        // and only triggers for permission/AskUser, not tool execution.
         var results = new ToolResult[toolCalls.Count];
         var readOnlyPending = new List<(int Index, ToolCall Call, ITool Tool)>();
         var writeable = new List<(int Index, ToolCall Call, ITool Tool)>();
