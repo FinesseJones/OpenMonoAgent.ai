@@ -519,7 +519,7 @@ if [ "$OPENMONO_ROLE" != "agent" ]; then
     # Use openmono start to launch llama-server via llama-native.sh
     # This ensures consistency between install and runtime startup paths.
     export LLAMA_PORT="${LLAMA_PORT:-7474}"
-    if ! "$REPO_DIR/openmono" start; then
+    if ! "$INSTALL_DIR/openmono" start; then
         warn "llama-server startup did not complete cleanly"
         warn "Check the log: openmono logs"
         warn "Or restart manually: openmono start"
