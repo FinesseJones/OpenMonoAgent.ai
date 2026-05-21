@@ -112,7 +112,7 @@ esac
 # Step counts vary by role.
 case "$OPENMONO_ROLE" in
     full)      TOTAL_STEPS=8 ;;
-    inference) TOTAL_STEPS=7 ;;
+    inference) TOTAL_STEPS=6 ;;
     agent)     TOTAL_STEPS=5 ;;
 esac
 
