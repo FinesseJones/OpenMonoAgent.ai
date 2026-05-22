@@ -30,6 +30,16 @@ install_to_system_path() {
         return 2
     fi
 
+    # Check if symlink already exists and points to correct location
+    if [ -L "$target" ]; then
+        local current_target
+        current_target=$(readlink "$target" 2>/dev/null)
+        if [ "$current_target" = "$install_dir/openmono" ]; then
+            detail "Symlink already valid at $target"
+            return 0
+        fi
+    fi
+
     # Check if /usr/local/bin is writable
     if [ ! -w /usr/local/bin ]; then
         detail "Insufficient permissions for /usr/local/bin (non-writable)"
