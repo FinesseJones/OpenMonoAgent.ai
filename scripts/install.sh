@@ -465,6 +465,8 @@ if [ "$OPENMONO_ROLE" != "agent" ]; then
 
     if [ "${GPU_MODE:-0}" = "1" ]; then
         info "GPU mode (selected during prerequisites)"
+    elif [ "${AMD_IGPU_MODE:-0}" = "1" ]; then
+        info "AMD iGPU mode (Vulkan)"
     else
         info "CPU mode"
     fi

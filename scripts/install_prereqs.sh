@@ -598,7 +598,7 @@ if [ "${NVIDIA_REBOOT_PENDING:-false}" = "true" ]; then
         if [[ "$_reboot_choice" == "Y" ]]; then
             touch "$_reboot_done_file"
             echo ""
-            info "After reboot, run: ${BOLD}$REPO_DIR/openmono setup${NC}"
+            info "After reboot, run: ${BOLD}openmono setup${NC}"
             echo ""
             info "Rebooting in 10 seconds (press Ctrl+C to cancel)..."
             sleep 10
@@ -636,7 +636,7 @@ if [ "${AMD_IGPU_REBOOT_PENDING:-false}" = "true" ]; then
 
     if [[ "$_reboot_choice" == "Y" ]]; then
         echo ""
-        info "After reboot, run: ${BOLD}$REPO_DIR/openmono setup${NC}"
+        info "After reboot, run: ${BOLD}openmono setup${NC}"
         echo ""
         info "Rebooting in 10 seconds (press Ctrl+C to cancel)..."
         sleep 10
