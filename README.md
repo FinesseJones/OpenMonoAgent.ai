@@ -28,11 +28,12 @@
   <img src="https://img.shields.io/badge/llama.cpp-local%20inference-black?logo=llama&logoColor=white" alt="llama.cpp" />
   <img src="https://img.shields.io/badge/self--hosted-yes-brightgreen" alt="Self-hosted" />
   <img src="https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black" alt="Linux" />
+  <img src="https://img.shields.io/badge/platform-macOS-000000?logo=apple&logoColor=white" alt="macOS" />
 </div>
 
 ---
 
-OpenMono is a coding agent that runs entirely on your hardware — no subscriptions, no data leaving your network, no per-token billing. It pairs a .NET 10 CLI with its own llama.cpp inference server, giving you a full agentic loop with 20 built-in tools, Docker sandboxing, and deep code intelligence. GPU or CPU, it auto-configures itself. You own the model, the compute, and the data.
+OpenMono is a coding agent that runs entirely on your hardware — no subscriptions, no data leaving your network, no per-token billing. It pairs a .NET 10 CLI with its own llama.cpp inference server, giving you a full agentic loop with 20 built-in tools, Docker sandboxing, and deep code intelligence. NVIDIA GPU, CPU, or Apple Silicon (Metal) — it auto-configures itself. You own the model, the compute, and the data.
 
 ---
 
@@ -93,7 +94,8 @@ It's a full [agentic loop](docs/ARCHITECTURE.md): 20 tools, sub-agents, Docker s
 llama.cpp ships inside Docker. Installer detects your hardware and picks the right model. After setup, every token is free.
 
 `GPU` Qwen3.6-27B dense · ~60 tok/s  
-`CPU` Qwen3.6-35B-A3B MoE · ~20 tok/s
+`CPU` Qwen3.6-35B-A3B MoE · ~20 tok/s  
+`Mac` Qwen3.6-35B-A3B MoE · Metal · ~45–48 tok/s
 
 → [Models & reasoning mode](docs/MODELS.md)
 
@@ -183,6 +185,8 @@ Attach images in chat with `@screenshot.png` or ask the agent to read any image 
 
 ## Supported Hardware
 
+### Linux — NVIDIA GPU / CPU
+
 | VRAM / RAM | Model | Accuracy | Speed |
 |------------|-------|----------|-------|
 | GPU 24 GB+ | Qwen3.6-27B-Q4_K_M | Full | ~45–70 tok/s |
@@ -190,8 +194,20 @@ Attach images in chat with `@screenshot.png` or ask the agent to read any image 
 | GPU 12 GB | Qwen3.5-9B-Q4_K_M | Lower | ~38–40 tok/s (RTX 3060) |
 | CPU 24 GB RAM | Qwen3.6-35B-A3B-UD-Q4_K_XL | Full | ~17–20 tok/s |
 
+### macOS — Apple Silicon (Metal)
+
+Inference runs natively on the Metal GPU via llama.cpp — no Docker needed for the model. Model tier is picked from the unified memory size.
+
+| Unified memory | Model | Accuracy | Context (vision on) | Speed | Status |
+|----------------|-------|----------|---------------------|-------|--------|
+| 64 GB+ | Qwen3.6-35B-A3B-UD-Q4_K_XL | Full | 192k (168k) | ~45–48 tok/s (M5 Pro) | ✅ Recommended / tested |
+| 32 GB | Qwen3.5-9B-Q4_K_M | Lower | 64k (48k) | ~22–27 tok/s (M1 Max) | ⚠️ Not encouraged |
+| 16 GB | Qwen3.5-9B-Q4_K_M | Lower | 16k (12k) | ~12–16 tok/s (M4) | ⚠️ Not encouraged |
+
 > [!NOTE]
-> The installer detects your hardware and selects the right model automatically — no config needed. 12 GB and 16 GB GPU cards are supported but run lower accuracy models. For best results, use a 24 GB card. Requires Ubuntu 26.04 LTS (recommended) or 25.10.
+> The installer detects your hardware and selects the right model automatically — no config needed. On Linux, 12 GB and 16 GB GPU cards are supported but run lower accuracy models; for best results use a 24 GB card. Linux requires Ubuntu 26.04 LTS (recommended) or 25.10.
+>
+> On **macOS**, the full and inference roles require Apple Silicon (M1+). **64 GB+ unified memory is the recommended, tested configuration** — full-accuracy 35B model at the full 192k context. Less than 64 GB is not encouraged — the installer falls back to a smaller model with a much tighter context window. Intel Macs are supported in **agent-only** mode (connect to a separate inference box). macOS 14+ (Sonoma/Sequoia) recommended.
 
 ## Architecture
 

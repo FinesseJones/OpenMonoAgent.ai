@@ -4,10 +4,14 @@
 
 | | |
 |--|--|
-| **OS** | Ubuntu 26.04 LTS (recommended) · 25.10 |
-| **GPU mode** | NVIDIA GPU · 12 GB VRAM minimum · 24 GB recommended |
-| **CPU mode** | 24 GB RAM |
+| **OS** | Ubuntu 26.04 LTS (recommended) · 25.10 · **macOS 14+** (Sonoma/Sequoia) |
+| **GPU mode** (Linux) | NVIDIA GPU · 12 GB VRAM minimum · 24 GB recommended |
+| **CPU mode** (Linux) | 24 GB RAM |
+| **Apple Silicon** (macOS) | M1+ · **64 GB+ unified memory recommended** (tested) · less than 64 GB not encouraged |
 | **Disk** | ~22 GB free (model + ~900 MB vision projector) |
+
+> [!NOTE]
+> Both Linux and macOS use the same install command — the installer detects your OS and architecture automatically. Intel Macs are supported in **agent-only** mode; native inference requires Apple Silicon. See [macOS notes](#macos-notes) below.
 
 ---
 
@@ -141,8 +145,11 @@ When setup finishes you'll see:
 Reload your shell so the `openmono` command is on your PATH:
 
 ```bash
-source ~/.bashrc
+source ~/.bashrc    # macOS / zsh: source ~/.zshrc
 ```
+
+> [!NOTE]
+> On macOS there's no `docker` group — skip the `newgrp docker` step. If `openmono` isn't found, run `source ~/.zshrc` or open a new terminal.
 
 If `openmono` or `docker` are still not found after that:
 
@@ -197,6 +204,54 @@ openmono status     # container · model status
 openmono logs       # tail live inference logs
 openmono help       # list all commands
 ```
+
+---
+
+## macOS notes
+
+macOS is supported alongside Linux — the same install command works on both, and the installer routes to the macOS path automatically when it detects Darwin.
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/StartupHakk/OpenMonoAgent.ai/refs/heads/main/get-openmono.sh)
+```
+
+### How macOS differs from Linux
+
+| | Linux | macOS (Apple Silicon) |
+|--|-------|------------------------|
+| **Inference** | llama.cpp in Docker (CUDA/CPU) | llama.cpp native on the host (Metal GPU) |
+| **Agent sandbox** | Docker | Docker (Docker Desktop or Colima) |
+| **Acceleration** | NVIDIA CUDA | Apple Metal — automatic |
+| **Connection** | localhost | container reaches the host via `host.docker.internal` |
+
+On Apple Silicon the model runs **natively** so it can use the Metal GPU and unified memory directly — Docker can't pass the GPU through on macOS. The agent still runs in a Docker container and talks to the native llama-server. Inference config is written to `~/.openmono/settings.json` and the generated API key is stored in `docker/.env`.
+
+### Prerequisites (installed automatically)
+
+Phase 1 installs, via Homebrew where needed:
+
+- **Homebrew** + **Xcode Command Line Tools**
+- Core tools: `git`, `curl`, `jq`, `cmake`, `ripgrep`, `openblas`, `pkg-config`, `python3` (3.10+)
+- **llama.cpp** (Metal backend) — Apple Silicon only
+- **Docker** — Docker Desktop if present, otherwise Colima is installed and started
+- **.NET 10 SDK** (to `~/.dotnet`)
+
+### Model tiers (Apple Silicon unified memory)
+
+The installer reads `hw.memsize` and picks the model for your memory tier:
+
+| Unified memory | Model | Accuracy | Context (vision on) | Status |
+|----------------|-------|----------|---------------------|--------|
+| 64 GB+ | Qwen3.6-35B-A3B-UD-Q4_K_XL | Full | 192k (168k) | ✅ Recommended / tested |
+| 32 GB | Qwen3.5-9B-Q4_K_M | Lower | 64k (48k) | ⚠️ Not encouraged |
+| 16 GB | Qwen3.5-9B-Q4_K_M | Lower | 16k (12k) | ⚠️ Not encouraged |
+
+> [!IMPORTANT]
+> **64 GB+ unified memory is the recommended, tested configuration** — full-accuracy 35B model at the full 192k context. The installer will still configure the 16 GB and 32 GB tiers (smaller 9B model, much tighter context), but **less than 64 GB is not encouraged** — they fall back to a smaller model with a much tighter context window. 16 GB is the hard floor: below it the full and inference roles refuse to install — use the **agent** role and point it at a separate inference server. As on Linux, vision (mmproj) downloads automatically and trims the context to keep the encoder within the memory budget.
+
+### Intel Macs
+
+Intel Macs have no Metal GPU and no unified memory, so native inference is unsupported. The installer allows only the **agent** role on Intel — it runs the agent locally and connects to a separate Apple Silicon or Linux inference box (see [Dual-box setup](#dual-box-setup)).
 
 ---
 
