@@ -116,7 +116,7 @@ public sealed class PlaybookConfig
 
 public sealed class AgentConfig
 {
-    public int MaxConcurrentAgents { get; set; } = 1;
+    public int MaxConcurrentAgents { get; set; } = 2;
     public int MaxNestingDepth { get; set; } = 3;
     public int MaxQueuedAgents { get; set; } = 4;
     public int MaxConcurrentPerParent { get; set; } = 2;

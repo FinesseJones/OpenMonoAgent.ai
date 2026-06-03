@@ -120,6 +120,10 @@ public sealed class AgentTool : ToolBase
 
             var sink = new SubAgentOutputSink(description, context.WriteOutput, context.Output);
             var inputReader = new NullInputReader();
+            // Sub-agents run on a background thread and have no console of their own, so they
+            // must never reach the parent's interactive permission prompt (that deadlocks).
+            // Give them a non-interactive engine that inherits the parent's session approvals.
+            var childPermissions = context.Permissions.CreateChildEngine(sink, inputReader);
             var llm = new OpenAiCompatClient(context.Config.Llm) { ApiKey = context.Config.Llm.ApiKey };
 
             try
@@ -127,7 +131,7 @@ public sealed class AgentTool : ToolBase
                 using var childLoop = new ConversationLoop(
                     llm:           llm,
                     tools:         subTools,
-                    permissions:   context.Permissions,
+                    permissions:   childPermissions,
                     output:        sink,
                     input:         inputReader,
                     liveFeedback:  null,

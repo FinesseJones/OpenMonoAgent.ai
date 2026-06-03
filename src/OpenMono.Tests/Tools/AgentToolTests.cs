@@ -107,7 +107,7 @@ public class AgentToolTests
     public void AgentConfig_HasSensibleDefaults()
     {
         var config = new AgentConfig();
-        config.MaxConcurrentAgents.Should().Be(1);
+        config.MaxConcurrentAgents.Should().Be(2);
         config.MaxNestingDepth.Should().Be(3);
     }
 

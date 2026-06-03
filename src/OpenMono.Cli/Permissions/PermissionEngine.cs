@@ -24,6 +24,7 @@ public sealed class PermissionEngine
     private readonly AppConfig _config;
     private readonly IOutputSink _output;
     private readonly IInputReader _input;
+    private readonly bool _nonInteractive;
     private readonly HashSet<string> _sessionAllowAll = [];
     private readonly HashSet<string> _sessionDenyAll = [];
     private int _consecutiveDenials;
@@ -34,11 +35,29 @@ public sealed class PermissionEngine
 
     private readonly List<(string CapType, string Pattern, bool Allow)> _sessionCapRules = [];
 
-    public PermissionEngine(AppConfig config, IOutputSink output, IInputReader input)
+    public PermissionEngine(AppConfig config, IOutputSink output, IInputReader input, bool nonInteractive = false)
     {
         _config = config;
         _output = output;
         _input  = input;
+        _nonInteractive = nonInteractive;
+    }
+
+    /// <summary>
+    /// Builds a permission engine for a sub-agent. The child cannot prompt the user
+    /// (sub-agents run on background threads with no console of their own), so any
+    /// uncovered capability is auto-denied. It inherits a snapshot of the parent's
+    /// session approvals so anything the user already allowed for the session still works.
+    /// </summary>
+    public PermissionEngine CreateChildEngine(IOutputSink output, IInputReader input)
+    {
+        var child = new PermissionEngine(_config, output, input, nonInteractive: true);
+        child._sessionAllowAll.UnionWith(_sessionAllowAll);
+        child._sessionDenyAll.UnionWith(_sessionDenyAll);
+        child._sessionAllowCapTypes.UnionWith(_sessionAllowCapTypes);
+        child._sessionDenyCapTypes.UnionWith(_sessionDenyCapTypes);
+        child._sessionCapRules.AddRange(_sessionCapRules);
+        return child;
     }
 
     public async Task<CapabilityDecision> CheckCapabilitiesAsync(
@@ -256,6 +275,13 @@ public sealed class PermissionEngine
     private async Task<CapabilityDecision> PromptUserForCapabilitiesAsync(
         string toolName, List<Capability> uncoveredCaps, IReadOnlyList<Capability> allCaps, CancellationToken ct)
     {
+        if (_nonInteractive)
+            return new(false,
+                $"{toolName} needs approval that a sub-agent cannot request: " +
+                string.Join(", ", uncoveredCaps.Select(c => c.Summary)) + ". " +
+                "Allow this capability in the main session first, then re-run the sub-agent.",
+                allCaps);
+
         var summary = $"{toolName} requires:\n" +
                       string.Join("\n", uncoveredCaps.Select(c => $"  - {c.Summary}"));
 
@@ -290,6 +316,11 @@ public sealed class PermissionEngine
     private async Task<PermissionDecision> PromptUserAsync(
         string toolName, JsonElement input, CancellationToken ct)
     {
+        if (_nonInteractive)
+            return new(false,
+                $"{toolName} needs approval that a sub-agent cannot request. " +
+                "Allow this tool in the main session first, then re-run the sub-agent.");
+
         var summary = BuildToolSummary(toolName, input);
         var response = await _input.AskPermissionAsync(toolName, summary, ct);
 
