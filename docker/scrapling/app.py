@@ -5,8 +5,8 @@ the inference box behind the Caddy gateway, which enforces the shared bearer
 token, so this service stays auth-free on the internal network and is never
 published to the host.
 
-POST /scrape  { "url": "...", "render": false, "max_length": 20000,
-                "format": "markdown" }
+POST /scrape  { "url": "...", "render": false, "headless": true,
+                "max_length": 20000, "format": "markdown" }
   -> { "status": 200, "url": "...", "engine": "fetcher"|"stealthy",
        "format": "markdown", "truncated": false, "content": "..." }
 """
@@ -28,6 +28,7 @@ app = FastAPI(title="OpenMono Scrapling service")
 class ScrapeRequest(BaseModel):
     url: str
     render: bool = False            # True -> skip the fast path, use the browser
+    headless: bool = True           # browser path only; False -> headed (needs a display)
     max_length: Optional[int] = None
     format: str = "markdown"        # markdown | text | html
 
@@ -42,10 +43,10 @@ def _extract(page, fmt: str) -> str:
     return md if md else (page.get_all_text() or "")
 
 
-def _stealth_fetch(url: str):
+def _stealth_fetch(url: str, headless: bool = True):
     # Camoufox-backed real browser; solves Cloudflare Turnstile / interstitials.
     return StealthyFetcher.fetch(
-        url, headless=True, solve_cloudflare=True, network_idle=True
+        url, headless=headless, solve_cloudflare=True, network_idle=True
     )
 
 
@@ -73,7 +74,7 @@ async def scrape(req: ScrapeRequest):
 
     if page is None:
         try:
-            page = await run_in_threadpool(_stealth_fetch, req.url)
+            page = await run_in_threadpool(_stealth_fetch, req.url, req.headless)
         except Exception as exc:  # noqa: BLE001
             return {
                 "status": 502,

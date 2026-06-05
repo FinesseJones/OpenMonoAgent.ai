@@ -17,6 +17,8 @@ public sealed partial class WebFetchTool : ToolBase
     protected override SchemaBuilder DefineSchema() => new SchemaBuilder()
         .AddString("url", "The URL to fetch")
         .AddInteger("max_length", "Maximum characters to return (default: 20000)")
+        .AddBoolean("render", "Force a real browser instead of a plain HTTP fetch (slower; for JS-heavy or bot-protected pages). Only applies when the Scrapling gateway is enabled. Default: false")
+        .AddBoolean("headless", "When the browser is used, run it headless. Set false for headed mode (requires a display on the scrape host). Default: true")
         .AddProperty("headers", new
         {
             type = "object",
@@ -54,6 +56,8 @@ public sealed partial class WebFetchTool : ToolBase
     {
         var url = input.GetProperty("url").GetString()!;
         var maxLength = input.TryGetProperty("max_length", out var ml) ? ml.GetInt32() : 20_000;
+        var render = input.TryGetProperty("render", out var r) && r.ValueKind == JsonValueKind.True;
+        var headless = !input.TryGetProperty("headless", out var h) || h.ValueKind != JsonValueKind.False;
 
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
             (uri.Scheme != "http" && uri.Scheme != "https"))
@@ -67,7 +71,7 @@ public sealed partial class WebFetchTool : ToolBase
             var gateway = GatewayCapabilities.ResolveGateway(context.Config)!;
             try
             {
-                return await ScraplingFetchAsync(gateway, context.Config.Llm.ApiKey, url, maxLength, ct);
+                return await ScraplingFetchAsync(gateway, context.Config.Llm.ApiKey, url, maxLength, render, headless, ct);
             }
             catch (Exception ex)
             {
@@ -80,13 +84,15 @@ public sealed partial class WebFetchTool : ToolBase
     }
 
     private static async Task<ToolResult> ScraplingFetchAsync(
-        string gateway, string? apiKey, string url, int maxLength, CancellationToken ct)
+        string gateway, string? apiKey, string url, int maxLength, bool render, bool headless, CancellationToken ct)
     {
         var payload = JsonSerializer.Serialize(new
         {
             url,
             max_length = maxLength,
             format = "markdown",
+            render,
+            headless,
         });
 
         using var request = new HttpRequestMessage(HttpMethod.Post, $"{gateway.TrimEnd('/')}/scrape")
