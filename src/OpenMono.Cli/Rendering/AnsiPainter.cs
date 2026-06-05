@@ -99,6 +99,12 @@ internal sealed partial class AnsiPainter(AppConfig config, SessionState session
     private volatile bool _paintInProgress;
     private CancellationTokenSource? _paintCts;
 
+    // A modal "lane" (permission prompt) is drawn directly over the bottom rows, but the
+    // background paint thread keeps repainting the input box / tab bar on top of it. While
+    // a lane is active we re-stamp it at the end of every full/conv paint so it stays visible.
+    private volatile bool _laneActive;
+    private string _laneOverlay = "";
+
     private readonly List<string> _cachedLines = [];
     private int _cachedMsgCount;
     private int _cachedWidth;
@@ -299,6 +305,10 @@ internal sealed partial class AnsiPainter(AppConfig config, SessionState session
         }
     }
 
+    // A "page" scrolls almost a full screen, keeping two lines of context overlap.
+    internal void ScrollPageUp()   => ScrollBy(Math.Max(1, ConvHeight - 2));
+    internal void ScrollPageDown() => ScrollBy(-Math.Max(1, ConvHeight - 2));
+
     internal void ScrollToTop()
     {
         _scrollOffset = GetMaxScrollOffset();
@@ -389,7 +399,26 @@ internal sealed partial class AnsiPainter(AppConfig config, SessionState session
         Row(2, opt3);
         Row(1, opt4);
 
-        lock (_writeLock) { W(sb.ToString()); Flush(); }
+        // Publish the overlay before flipping the flag so any concurrent paint that observes
+        // _laneActive == true (a volatile read inside _writeLock) is guaranteed to see the text.
+        _laneOverlay = sb.ToString();
+        _laneActive  = true;
+        lock (_writeLock) { W(_laneOverlay); Flush(); }
+    }
+
+    // Stops the modal lane from being re-stamped. Must be followed by a full repaint to
+    // clear the lane rows and restore the normal input box / tab bar.
+    internal void ClearLane()
+    {
+        _laneActive  = false;
+        _laneOverlay = "";
+    }
+
+    // Re-draws the active modal lane as the last thing written, so a full/conv repaint that
+    // would otherwise cover the bottom rows leaves the prompt visible. Caller holds _writeLock.
+    private void AppendLaneOverlay(StringBuilder sb)
+    {
+        if (_laneActive) sb.Append(_laneOverlay);
     }
 
     internal void ShowCtrlCBanner()
@@ -901,6 +930,7 @@ internal sealed partial class AnsiPainter(AppConfig config, SessionState session
             if (_contextWarningPct > 0) PaintContextWarning(sb);
 
             sb.Append(R);
+            AppendLaneOverlay(sb);
             W(sb.ToString());
             Flush();
         }
@@ -929,6 +959,7 @@ internal sealed partial class AnsiPainter(AppConfig config, SessionState session
         if (_ctrlCBannerVisible) PaintCtrlCBanner(sb);
         if (_contextWarningPct > 0) PaintContextWarning(sb);
         sb.Append(R);
+        AppendLaneOverlay(sb);
         W(sb.ToString());
         Flush();
         _paintInProgress = false;
@@ -1458,19 +1489,11 @@ internal sealed partial class AnsiPainter(AppConfig config, SessionState session
             {
                 lines.Add("");
                 var mdLines = AnsiMarkdown.Render(m.Text, w - 4);
-                const int maxLines  = 50;
-                const int keepLines = 45;
-                if (mdLines.Count > maxLines)
-                {
-                    for (var i = 0; i < keepLines; i++)
-                        lines.Add($"  {Fk}│{R} {mdLines[i]}");
-                    lines.Add($"  {Fk}│{R} {DM}{Fk}... ({mdLines.Count - keepLines} more lines){R}");
-                }
-                else
-                {
-                    foreach (var l in mdLines)
-                        lines.Add($"  {Fk}│{R} {l}");
-                }
+                // Render the full message; the conversation buffer is bounded globally by
+                // MaxCachedLines/TrimThreshold, so long messages stay fully scrollable
+                // instead of being clipped to a per-message line cap.
+                foreach (var l in mdLines)
+                    lines.Add($"  {Fk}│{R} {l}");
                 if (m.Footer is not null)
                     lines.Add($"  {Fbb}■{R}  {Fk}{m.Footer}{R}");
                 break;

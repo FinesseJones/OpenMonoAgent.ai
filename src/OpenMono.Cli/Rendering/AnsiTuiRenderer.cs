@@ -45,7 +45,9 @@ public sealed class AnsiTuiRenderer : IRenderer
     public void EnterFullScreen()
     {
         _painter.Sz();
-        _painter.Write($"{AnsiPainter.E}[?1049h{AnsiPainter.E}[?25l{AnsiPainter.E}[2J");
+        // ?1049h alt-screen, ?1000h button tracking + ?1006h SGR coords (enables wheel scroll),
+        // ?25l hide cursor, 2J clear. Mouse modes are torn down in Exit/SafeExit (?1000l ?1006l).
+        _painter.Write($"{AnsiPainter.E}[?1049h{AnsiPainter.E}[?1000h{AnsiPainter.E}[?1006h{AnsiPainter.E}[?25l{AnsiPainter.E}[2J");
         AnsiPainter.Flush();
         _inFullScreen = true;
         _painter.InvalidateCache();

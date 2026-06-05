@@ -44,19 +44,53 @@ internal sealed class AnsiInputReader(
                 if (s == "O" && Console.KeyAvailable)
                     continue;
 
+                // SGR mouse report: ESC [ < Cb ; Cx ; Cy (M=press, m=release).
+                // The scroll wheel arrives as a press with bit 0x40 set; low 2 bits
+                // give direction (0=up, 1=down). Clicks/other buttons are ignored.
+                if ((ch == 'M' || ch == 'm') && s.Length > 3 && s[0] == '[' && s[1] == '<')
+                {
+                    var body  = s.Substring(2, s.Length - 3);
+                    var semi  = body.IndexOf(';');
+                    var cbStr = semi >= 0 ? body[..semi] : body;
+                    if (int.TryParse(cbStr, out var cb) && (cb & 0x40) != 0)
+                    {
+                        var dir = cb & 0x3;
+                        if (dir == 0) return (+2, null, 0, 0); // wheel up   → line scroll
+                        if (dir == 1) return (-2, null, 0, 0); // wheel down → line scroll
+                    }
+                    return (0, null, 0, 0);
+                }
+
+                // scroll magnitude: ±1 = page (PageUp/PageDown), ±2 = line (Shift+arrows)
                 return s switch
                 {
                     "b" or "[1;3D" or "[1;5D" => (0, null, -1,  0),
                     "f" or "[1;3C" or "[1;5C" => (0, null, +1,  0),
                     "[1;9D" or "[H" or "OH"   => (0, null,  0, -1),
                     "[1;9C" or "[F" or "OF"   => (0, null,  0, +1),
-                    "[5~"  or "[1;2A"         => (+1, null,  0,  0),
-                    "[6~"  or "[1;2B"         => (-1, null,  0,  0),
+                    "[5~"                      => (+1, null,  0,  0),
+                    "[6~"                      => (-1, null,  0,  0),
+                    "[1;2A"                    => (+2, null,  0,  0),
+                    "[1;2B"                    => (-2, null,  0,  0),
                     _                          => (0, null,  0,  0),
                 };
             }
         }
         return (0, null, 0, 0);
+    }
+
+    // Maps a scroll code from TryReadEscapeSequence to a paint: ±1 pages, ±2 scrolls a few lines.
+    private void ApplyScroll(int scroll)
+    {
+        switch (scroll)
+        {
+            case  1: painter.ScrollPageUp();   break;
+            case -1: painter.ScrollPageDown(); break;
+            case  2: painter.ScrollBy(+3);     break;
+            case -2: painter.ScrollBy(-3);     break;
+            default: return;
+        }
+        painter.Paint();
     }
 
     private static int MoveWordBackward(string text, int cursor)
@@ -154,16 +188,15 @@ internal sealed class AnsiInputReader(
                         _bgInputBuf.Append(paste.Replace("\r\n", "\n").Replace('\r', '\n'));
                         if (!painter.PaintInProgress) painter.DrawInputText(_bgInputBuf.ToString(), _bgInputBuf.Length);
                     }
-                    else if (scroll > 0) { painter.ScrollBy(+3); painter.Paint(); }
-                    else if (scroll < 0) { painter.ScrollBy(-3); painter.Paint(); }
+                    else if (scroll != 0) { ApplyScroll(scroll); }
                     continue;
                 }
                 CurrentTurnCts?.Cancel();
                 continue;
             }
 
-            if (k.Key == ConsoleKey.PageUp)   { painter.ScrollBy(+3); painter.Paint(); continue; }
-            if (k.Key == ConsoleKey.PageDown) { painter.ScrollBy(-3); painter.Paint(); continue; }
+            if (k.Key == ConsoleKey.PageUp)   { painter.ScrollPageUp(); painter.Paint(); continue; }
+            if (k.Key == ConsoleKey.PageDown) { painter.ScrollPageDown(); painter.Paint(); continue; }
 
             if (k.Key == ConsoleKey.C && k.Modifiers.HasFlag(ConsoleModifiers.Control))
             {
@@ -210,14 +243,14 @@ internal sealed class AnsiInputReader(
 
             if (k.Key == ConsoleKey.PageUp)
             {
-                painter.ScrollBy(+3);
+                painter.ScrollPageUp();
                 painter.Paint();
                 continue;
             }
 
             if (k.Key == ConsoleKey.PageDown)
             {
-                painter.ScrollBy(-3);
+                painter.ScrollPageDown();
                 painter.Paint();
                 continue;
             }
@@ -318,7 +351,9 @@ internal sealed class AnsiInputReader(
             $"  {AnsiPainter.B}{AnsiPainter.Fr}[!]{AnsiPainter.R}{AnsiPainter.BgInput}  Deny all"
         );
 
-        var response = ReadPermissionKey();
+        PermissionResponse response;
+        try { response = ReadPermissionKey(); }
+        finally { painter.ClearLane(); }
         painter.Paint();
         StartBackgroundInput();
         return Task.FromResult(response);
@@ -371,8 +406,8 @@ internal sealed class AnsiInputReader(
                     painter.PaintConvThrottled(force: true);
                 }
 
-                if (k.Key == ConsoleKey.PageUp)   { painter.ScrollBy(+3); painter.Paint(); continue; }
-                if (k.Key == ConsoleKey.PageDown) { painter.ScrollBy(-3); painter.Paint(); continue; }
+                if (k.Key == ConsoleKey.PageUp)   { painter.ScrollPageUp(); painter.Paint(); continue; }
+                if (k.Key == ConsoleKey.PageDown) { painter.ScrollPageDown(); painter.Paint(); continue; }
 
                 if (k.Key == ConsoleKey.C && k.Modifiers.HasFlag(ConsoleModifiers.Control))
                 {
@@ -439,8 +474,7 @@ internal sealed class AnsiInputReader(
                         else if (wordMove > 0) { cur = MoveWordForward(buf.ToString(), cur);  painter.DrawInputText(buf.ToString(), cur); }
                         else if (lineMove < 0) { cur = 0;           painter.DrawInputText(buf.ToString(), cur); }
                         else if (lineMove > 0) { cur = buf.Length;  painter.DrawInputText(buf.ToString(), cur); }
-                        else if (scroll > 0) { painter.ScrollBy(+3); painter.Paint(); }
-                        else if (scroll < 0) { painter.ScrollBy(-3); painter.Paint(); }
+                        else if (scroll != 0) { ApplyScroll(scroll); }
                         continue;
                     }
                     if (atVis) { suggestions.HideAtSuggestions(buf.ToString()); atVis = false; continue; }
@@ -569,13 +603,13 @@ internal sealed class AnsiInputReader(
 
                 if (k.Key == ConsoleKey.PageUp)
                 {
-                    painter.ScrollBy(+3);
+                    painter.ScrollPageUp();
                     painter.PaintConvThrottled(force: true);
                     continue;
                 }
                 if (k.Key == ConsoleKey.PageDown)
                 {
-                    painter.ScrollBy(-3);
+                    painter.ScrollPageDown();
                     painter.PaintConvThrottled(force: true);
                     continue;
                 }
