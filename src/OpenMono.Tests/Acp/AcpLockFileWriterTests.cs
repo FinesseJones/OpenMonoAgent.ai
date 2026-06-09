@@ -82,6 +82,32 @@ public sealed class AcpLockFileWriterTests : IDisposable
     }
 
     [Fact]
+    public void AgentId_IsStableAcrossRestarts_ForTheSameWorkspace()
+    {
+        Environment.SetEnvironmentVariable("HOST_WORKSPACE_PATH", "/Users/dev/my-project");
+        Environment.SetEnvironmentVariable("ACP_AGENT_ID", null);
+
+        var first = new AcpLockFileWriter(_settings, _tempMount).AgentId;
+        var second = new AcpLockFileWriter(_settings, _tempMount).AgentId;
+
+        second.Should().Be(first);
+    }
+
+    [Fact]
+    public void AgentId_DiffersBetweenWorkspaces()
+    {
+        Environment.SetEnvironmentVariable("ACP_AGENT_ID", null);
+
+        Environment.SetEnvironmentVariable("HOST_WORKSPACE_PATH", "/Users/dev/project-a");
+        var a = new AcpLockFileWriter(_settings, _tempMount).AgentId;
+
+        Environment.SetEnvironmentVariable("HOST_WORKSPACE_PATH", "/Users/dev/project-b");
+        var b = new AcpLockFileWriter(_settings, _tempMount).AgentId;
+
+        a.Should().NotBe(b);
+    }
+
+    [Fact]
     public void Write_creates_dot_openmono_directory_if_missing()
     {
         Environment.SetEnvironmentVariable("HOST_WORKSPACE_PATH", "/ws");
