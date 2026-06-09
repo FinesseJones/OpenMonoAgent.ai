@@ -61,7 +61,7 @@ public sealed class AcpEndpointsTests : IAsyncLifetime
         services.AddSingleton<ILiveFeedback>(renderer);
 
         services.AddSingleton(sp => new AcpSessionStore(sp.GetRequiredService<AppConfig>(), sp.GetRequiredService<AcpServerSettings>(), startReaper: false));
-        services.AddSingleton(sp => new AcpLockFileWriter(sp.GetRequiredService<AcpServerSettings>(), _tempDir));
+        services.AddSingleton(sp => new AcpLockFileWriter(sp.GetRequiredService<AcpServerSettings>(), "/workspace"));
         services.AddSingleton(sp => new ConversationLoopFactory(
             sp.GetRequiredService<ILlmClient>(),
             sp.GetRequiredService<ToolRegistry>(),

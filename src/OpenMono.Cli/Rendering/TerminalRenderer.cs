@@ -333,6 +333,8 @@ public sealed class TerminalRenderer : IRenderer
 
     public void WriteToolDiff(string diff) { }
 
+    public void WriteToolContent(string toolName, string filePath, string content) { }
+
     public void WriteTodos(IReadOnlyList<Session.TodoItem> todos)
     {
         if (todos.Count == 0) return;
