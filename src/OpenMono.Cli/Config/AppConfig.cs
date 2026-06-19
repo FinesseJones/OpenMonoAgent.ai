@@ -6,6 +6,7 @@ namespace OpenMono.Config;
 public sealed class AppConfig
 {
     public LlmConfig Llm { get; set; } = new();
+    public WebConfig Web { get; set; } = new();
     public PermissionConfig Permissions { get; set; } = new();
     public HookConfig Hooks { get; set; } = new();
     public PlaybookConfig Playbooks { get; set; } = new();
@@ -75,6 +76,37 @@ public class LlmConfig
         if (source.MinP > 0) MinP = source.MinP;
         if (source.RepetitionPenalty > 0) RepetitionPenalty = source.RepetitionPenalty;
     }
+}
+
+/// <summary>
+/// Inference-side web services reached through the Caddy gateway. When
+/// <see cref="Gateway"/> is set, WebSearch routes to SearXNG and WebFetch to
+/// Scrapling; the per-service flags let the agent fall back to its built-in
+/// DuckDuckGo / direct-fetch behaviour when a service isn't installed.
+/// Flags are stored as strings because <c>openmono config set</c> writes string
+/// values; <see cref="SearchEnabled"/> / <see cref="ScrapeEnabled"/> parse them.
+/// </summary>
+public sealed class WebConfig
+{
+    public string? Gateway { get; set; }
+    public string? Search { get; set; }
+    public string? Scrape { get; set; }
+
+    /// <summary>null = unspecified (try the gateway, fall back on error).</summary>
+    public bool? SearchEnabled => Truthy(Search);
+    public bool? ScrapeEnabled => Truthy(Scrape);
+
+    public void MergeFrom(WebConfig source)
+    {
+        if (!string.IsNullOrEmpty(source.Gateway)) Gateway = source.Gateway;
+        if (!string.IsNullOrEmpty(source.Search)) Search = source.Search;
+        if (!string.IsNullOrEmpty(source.Scrape)) Scrape = source.Scrape;
+    }
+
+    private static bool? Truthy(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? null
+            : value.Trim().ToLowerInvariant() is "1" or "true" or "yes" or "on";
 }
 
 public sealed class PermissionConfig

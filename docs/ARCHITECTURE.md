@@ -43,6 +43,58 @@ OpenMono is a .NET 10 CLI that runs a local agentic loop against a llama.cpp inf
 
 ---
 
+## Inference-side web services (Caddy gateway)
+
+The agent's `WebSearch` and `WebFetch` tools can be backed by self-hosted
+services that run next to the inference server, all inside Docker:
+
+- **SearXNG** — private metasearch, backs `WebSearch`.
+- **Scrapling** — anti-bot scraping (Cloudflare/CAPTCHA bypass), backs `WebFetch`.
+
+Both are optional and opt-in per service. A single **Caddy** gateway is the only
+front door: frpc tunnels just the gateway, so the relay still allocates **one**
+port. Caddy path-routes, reusing `LLAMA_API_KEY` as a shared L7 bearer in front
+of the two services (llama keeps enforcing its own `--api-key`):
+
+```
+                       ┌──────────── inference box ────────────┐
+agent ──frpc/relay──▶  │  Caddy gateway :8080                   │
+  llm.endpoint   ┐     │   /v1,/props,/metrics → llama-server   │ (pass-through)
+  web.gateway  ──┴───▶ │   /search*  [Bearer]  → SearXNG        │
+                       │   /scrape*  [Bearer]  → Scrapling      │
+                       │   /services           → capability JSON│
+                       │   /health             → 200            │
+                       └────────────────────────────────────────┘
+```
+
+- `llm.endpoint` and `web.gateway` resolve to the **same** relay base URL in
+  dual-box mode — Caddy fans them apart by path. So `web.gateway` is **optional**:
+  when unset, the agent uses `llm.endpoint` as the gateway. In dual-box mode the
+  only thing to configure on the agent box is `llm.endpoint` + `llm.api_key`.
+- **The agent auto-detects services** by probing the gateway's `GET /services`
+  registry (`GatewayCapabilities`, cached per gateway for the process lifetime).
+  No need to mirror `web.search` / `web.scrape` into local config — though an
+  explicit flag (config or env `OPENMONO_WEB_SEARCH` / `OPENMONO_WEB_SCRAPE`)
+  still wins as an override. When a service is absent, the probe fails, or the
+  gateway errors, the tools fall back to built-in DuckDuckGo / direct-fetch.
+- The inference box is the source of truth for what's installed
+  (`WEB_*_ENABLED` in `docker/.env`, reported on `GET /services`).
+
+Install (inference/full box):
+
+```
+openmono setup search     # SearXNG  + gateway
+openmono setup scraper    # Scrapling + gateway
+```
+
+Files: [docker/Caddyfile](../docker/Caddyfile),
+[docker/searxng/settings.yml](../docker/searxng/settings.yml),
+[docker/scrapling/](../docker/scrapling/), and the `caddy`/`searxng`/`scrapling`
+services in [docker/docker-compose.yml](../docker/docker-compose.yml)
+(profiles `search` / `scraper`).
+
+---
+
 ## Startup sequence (`Program.cs`)
 
 1. Parse CLI flags (`--tui`, `--classic`, `--endpoint`, `--model`, `--verbose`, …)

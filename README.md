@@ -227,6 +227,23 @@ Settings load from `~/.openmono/settings.json` (user-level) or `.openmono/settin
 
 → [Commands, slash commands & keyboard shortcuts](docs/SETUP.md)
 
+## Web services (optional)
+
+Back the agent's `WebSearch` and `WebFetch` tools with self-hosted services that
+run entirely in Docker on the inference box, behind a single Caddy gateway (one
+tunnelled port, shared `LLAMA_API_KEY` auth):
+
+```bash
+openmono setup search     # SearXNG  — private web search
+openmono setup scraper    # Scrapling — anti-bot scraping (Cloudflare/CAPTCHA bypass)
+```
+
+Both are opt-in (you're also prompted during `openmono setup`). When a service
+isn't installed, the tools fall back to their built-in DuckDuckGo / direct-fetch
+behaviour.
+
+→ [Inference-side web services](docs/ARCHITECTURE.md)
+
 ## Docs
 
 - [Roadmap](ROADMAP.md)
